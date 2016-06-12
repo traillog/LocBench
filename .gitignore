@@ -45,3 +45,20 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+*.tlog
+*.log
+hpos/Debug/hpos.exe.embed.manifest
+hpos/Debug/hpos.exe.embed.manifest.res
+hpos/Debug/hpos.exe.intermediate.manifest
+*.ilk
+*.lastbuildstate
+*.obj
+*.pdb
+hpos/Debug/hpos_manifest.rc
+*.idb
+*.sdf
+*.suo
+*.user
+hpos/Release/hpos.exe.intermediate.manifest
+*.nmea
+*.ipch
