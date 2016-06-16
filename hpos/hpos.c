@@ -9,6 +9,7 @@
 
 #define     ERRMSG      256
 #define     LINEIN      128
+#define     VALIN       32
 
 extern VOID ReportError( LPCTSTR userMsg, DWORD exitCode, BOOL prtErrorMsg );
 
@@ -25,6 +26,12 @@ int wmain( int argc, TCHAR* argv[] )
     char *ptMsg = NULL;
     char *nextptMsg = NULL;
     int fieldNo = 0;
+
+    BOOL dataOk = FALSE;
+    char status[ VALIN ] = { 0 };
+    char tmpLat[ VALIN ] = { 0 };
+    char tmpLon[ VALIN ] = { 0 };
+    char tmpAlt[ VALIN ] = { 0 };
 
     Tree latTree;
     Tree lonTree;
@@ -75,11 +82,11 @@ int wmain( int argc, TCHAR* argv[] )
                 // Store value in tree
                 // If already in tree, then update counters
                 if ( fieldNo == 2 )
-                    addVal( ptMsg, &latTree );
+                    strcpy_s( tmpLat, _countof( tmpLat ), ptMsg );
                 else if ( fieldNo == 4 )
-                    addVal( ptMsg, &lonTree );
+                    strcpy_s( tmpLon, _countof( tmpLon ), ptMsg );
                 else if ( fieldNo == 9 )
-                    addVal( ptMsg, &altTree );
+                    strcpy_s( tmpAlt, _countof( tmpAlt ), ptMsg );
 
                 // Locate next field (token)
                 ptMsg = strtok_s( NULL, ",*", &nextptMsg );
@@ -87,6 +94,48 @@ int wmain( int argc, TCHAR* argv[] )
                 // Inc field counter
                 ++fieldNo;
             }
+        }
+        else if ( strstr( inputLine, "$GPRMC" ) )
+        {
+            // Reset field counter
+            fieldNo = 0;
+
+            // Locate first field (token)
+            ptMsg = strtok_s( inputLine, ",*", &nextptMsg );
+
+            while ( ptMsg != NULL )
+            {
+                // Process fields of interest
+                // Store value in tree
+                // If already in tree, then update counters
+                if ( fieldNo == 2 )
+                    strcpy_s( status, _countof( status ), ptMsg );
+
+                // Locate next field (token)
+                ptMsg = strtok_s( NULL, ",*", &nextptMsg );
+
+                // Inc field counter
+                ++fieldNo;
+            }
+
+            // Validate processed line
+            dataOk = ( strlen( status ) == 1 ) && ( strstr( status, "A" ) ) &&
+                ( strlen( tmpLat ) == 9 ) && ( strlen( tmpLon ) == 10 );
+
+            if ( dataOk )
+            {
+                // Store current vals into trees
+                addVal( tmpLat, &latTree );
+                addVal( tmpLon, &lonTree );
+                addVal( tmpAlt, &altTree );
+            }
+
+            // Reset result strings
+            dataOk = FALSE;
+            memset( status, 0, _countof( status ) );
+            memset( tmpLat, 0, _countof( tmpLat ) );
+            memset( tmpLon, 0, _countof( tmpLon ) );
+            memset( tmpAlt, 0, _countof( tmpAlt ) );
         }
 
         // Reset input line buffer
@@ -112,8 +161,8 @@ int wmain( int argc, TCHAR* argv[] )
     showVals( &lonTree );
 
     // Display Altitudes
-    wprintf_s( TEXT( "\n\n    Alt:\n\n" ) );
-    showVals( &altTree );
+    //wprintf_s( TEXT( "\n\n    Alt:\n\n" ) );
+    //showVals( &altTree );
 
     // Destroy storage trees
     DeleteAll( &latTree );

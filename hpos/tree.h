@@ -15,7 +15,7 @@
 #define     FALSE       0
 #define     TRUE        1
 
-#define     VALSTR      12
+#define     VALSTR      32
 
 /* redefine Item as appropriate */
 typedef struct item
