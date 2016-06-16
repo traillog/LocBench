@@ -62,3 +62,4 @@ hpos/Debug/hpos_manifest.rc
 hpos/Release/hpos.exe.intermediate.manifest
 *.nmea
 *.ipch
+*.cache

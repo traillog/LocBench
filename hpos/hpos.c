@@ -5,11 +5,16 @@
 #include <windows.h>
 #include <stdio.h>
 #include <wchar.h>
+#include "tree.h"
 
 #define     ERRMSG      256
 #define     LINEIN      128
 
 extern VOID ReportError( LPCTSTR userMsg, DWORD exitCode, BOOL prtErrorMsg );
+
+void addVal( char* valStr, Tree* pt );
+void showVals( const Tree* pt );
+void printitem( Item item );
 
 int wmain( int argc, TCHAR* argv[] )
 {
@@ -20,6 +25,10 @@ int wmain( int argc, TCHAR* argv[] )
     char *ptMsg = NULL;
     char *nextptMsg = NULL;
     int fieldNo = 0;
+
+    Tree latTree;
+    Tree lonTree;
+    Tree altTree;
 
     // Validate args count
     if ( argc != 2 )
@@ -38,6 +47,11 @@ int wmain( int argc, TCHAR* argv[] )
         fwprintf( stderr, TEXT( "%s\n" ), errMsg );
         return 1;
     }
+
+    // Initialize storage trees
+    InitializeTree( &latTree );
+    InitializeTree( &lonTree );
+    InitializeTree( &altTree );
 
     // Reset input line buffer
     memset( inputLine, 0, _countof( inputLine ) );
@@ -58,12 +72,14 @@ int wmain( int argc, TCHAR* argv[] )
             while ( ptMsg != NULL )
             {
                 // Process fields of interest
+                // Store value in tree
+                // If already in tree, then update counters
                 if ( fieldNo == 2 )
-                    printf( "Lat: %s ", ptMsg );
+                    addVal( ptMsg, &latTree );
                 else if ( fieldNo == 4 )
-                    printf( "Lon: %s ", ptMsg );
+                    addVal( ptMsg, &lonTree );
                 else if ( fieldNo == 9 )
-                    printf( "Alt: %s\n", ptMsg );
+                    addVal( ptMsg, &altTree );
 
                 // Locate next field (token)
                 ptMsg = strtok_s( NULL, ",*", &nextptMsg );
@@ -87,5 +103,54 @@ int wmain( int argc, TCHAR* argv[] )
         return 1;
     }
 
+    // Display Latitudes
+    wprintf_s( TEXT( "\n    Lat:\n\n" ) );
+    showVals( &latTree );
+
+    // Display Longitudes
+    wprintf_s( TEXT( "\n\n    Lon:\n\n" ) );
+    showVals( &lonTree );
+
+    // Display Altitudes
+    wprintf_s( TEXT( "\n\n    Alt:\n\n" ) );
+    showVals( &altTree );
+
+    // Destroy storage trees
+    DeleteAll( &latTree );
+    DeleteAll( &lonTree );
+    DeleteAll( &altTree );
+
     return 0;
+}
+
+void addVal( char* valStr, Tree* pt )
+{
+    int i = 0;
+    Item temp = { 0 };
+
+    if ( TreeIsFull( pt ) )
+        puts( "Storage tree is full." );
+    else
+    {
+        // Set up new item
+        sprintf_s( temp.val, _countof( temp.val ), "%10s", valStr );
+        temp.count = 1;
+        
+        // Add new item to the tree
+        AddItem( &temp, pt );
+    }
+}
+
+void showVals( const Tree* pt )
+{
+    if ( TreeIsEmpty( pt ) )
+        puts( "No entries!" );
+    else
+        Traverse( pt, printitem );
+}
+
+void printitem( Item item )
+{
+    // Print values's details
+    printf( "    %s,%d\n", item.val, item.count );
 }
