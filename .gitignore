@@ -63,3 +63,7 @@ hpos/Release/hpos.exe.intermediate.manifest
 *.nmea
 *.ipch
 *.cache
+*.opensdf
+*.xls
+*.csv
+*.kml

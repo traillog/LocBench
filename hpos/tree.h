@@ -17,24 +17,28 @@
 
 #define     VALSTR      32
 
-/* redefine Item as appropriate */
 typedef struct item
 {
-    char val[ VALSTR ];
-    int count;
+    char nmeaVal[ VALSTR ]; // Raw nmea value (extra signed lat, lon)
+    int intVal;             // Signed int full precision [ms] or [dm]
+    double dblVal;          // Signed double end units [deg] or [m]
+    int ct;                 // Count of pts with this value
+    double wtVal;           // Weighted value [deg] or [m]
 } Item;
 
 typedef struct node
 {
     Item item;
-    struct node* left;      /* pointer to right branch  */
-    struct node* right;     /* pointer to left branch   */
+    struct node* left;      // pointer to right branch
+    struct node* right;     // pointer to left branch
 } Node;
 
 typedef struct tree
 {
-    Node* root;             /* pointer to root of tree  */
-    int size;               /* number of items in tree  */
+    Node* root;             // pointer to root of tree
+    int ctTotNodes;         // number of nodes in tree
+    int ctTotMeas;          // Total measurements considered
+    double wtTotVal;        // Total weighted result [deg] or [m]
 } Tree;
 
 /* function prototypes */
@@ -93,7 +97,12 @@ int DeleteItem( const Item* pi, Tree* ptree );
 /*                 value                               */
 /* postcondition:  the function pointed to by pfun is  */
 /*                 executed once for each item in tree */
-void Traverse( const Tree* ptree, void ( *pfun )( Item item ) );
+void Traverse( Tree* ptree, void ( *pfun )( Item* itemPt, int val ) );
+
+/* operation:      get total weighted value from tree  */
+/* preconditions:  ptree points to a tree              */
+/* postcondition:  total weighted value is retrieved   */
+double TraverseWtVal( Tree* ptree );
 
 /* operation:      delete everything from a tree       */
 /* preconditions:  ptree points to an initialized tree */

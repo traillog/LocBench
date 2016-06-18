@@ -23,7 +23,9 @@ static Node* MakeNode( const Item* pi );
 static int ToLeft( const Item* i1, const Item* i2 );
 static int ToRight( const Item* i1, const Item* i2 );
 static void AddNode( Node* new_nodePt, Node* root );
-static void InOrder( const Node* root, void ( *pfun )( Item item ) );
+static void InOrder( Node* root, void ( *pfun )( Item* itemPt, int val ),
+    int wtVal );
+static double InOrderWtVal( Node* root );
 static Pair SeekItem( const Item* pi, const Tree* ptree );
 static void DeleteNode( Node** ptr );
 static void DeleteAllNodes( Node* ptr );
@@ -32,7 +34,9 @@ static void DeleteAllNodes( Node* ptr );
 void InitializeTree( Tree* ptree )
 {
     ptree->root = NULL;
-    ptree->size = 0;
+    ptree->ctTotNodes = 0;
+    ptree->ctTotMeas = 0;
+    ptree->wtTotVal = 0;
 }
 
 /* returns true if tree is empty */
@@ -67,7 +71,7 @@ int TreeIsFull( const Tree* ptree )
 
 int TreeItemCount( const Tree* ptree )
 {
-    return ptree->size;
+    return ptree->ctTotNodes;
 }
 
 int AddItem( const Item* pi, Tree* ptree )
@@ -84,11 +88,12 @@ int AddItem( const Item* pi, Tree* ptree )
     }
 
     // Check whether item to add is already in the tree
-    // If already in the tree --> increment count value
+    // If already in the tree --> increment measurements count value
     serachRes = SeekItem( pi, ptree );
     if ( serachRes.child != NULL )
     {
-        ++serachRes.child->item.count;
+        serachRes.child->item.ct++;
+        ptree->ctTotMeas++;
         return TRUE;
     }
 
@@ -101,7 +106,8 @@ int AddItem( const Item* pi, Tree* ptree )
     }
 
     /* succeeded in creating a new node */
-    ptree->size++;
+    ptree->ctTotNodes++;
+    ptree->ctTotMeas++;
 
     if ( ptree->root == NULL )      /* case 1: tree is empty  */
         ptree->root = new_nodePt;   /* new node is tree root  */
@@ -142,15 +148,25 @@ int DeleteItem( const Item* pi, Tree* ptree )
         DeleteNode( &look.parent->right );
 
     // Decrement size of the tree
-    ptree->size--;
+    ptree->ctTotNodes--;
 
     return TRUE;
 }
 
-void Traverse ( const Tree* ptree, void ( *pfun )( Item item ) )
+void Traverse( Tree* ptree, void ( *pfun )( Item* itemPt, int val ) )
 {
     if ( ptree != NULL )
-        InOrder( ptree->root, pfun );
+        InOrder( ptree->root, pfun, ptree->ctTotMeas );
+}
+
+double TraverseWtVal( Tree* ptree )
+{
+    double res = 0;
+
+    if ( ptree != NULL )
+        res = InOrderWtVal( ptree->root );
+
+    return res;
 }
 
 // Delete the whole tree
@@ -164,24 +180,50 @@ void DeleteAll( Tree* ptree )
     ptree->root = NULL;
 
     // Reset node counter
-    ptree->size = 0;
+    ptree->ctTotNodes = 0;
+
+    // Reset measurements counter
+    ptree->ctTotMeas = 0;
+
+    // Reset total weighted value
+    ptree->wtTotVal = 0;
 }
 
 
 /* local functions */
-static void InOrder( const Node* root, void ( *pfun )( Item item ) )
+static void InOrder( Node* root, void ( *pfun )( Item* itemPt, int val ),
+    int wtVal )
 {
     if ( root != NULL )
     {
-        // Process left subtree
-        InOrder( root->left, pfun );
+        // Process right subtree
+        InOrder( root->right, pfun, wtVal );
 
         // Process item in node
-        ( *pfun )( root->item );
-
-        // Process right subtree
-        InOrder( root->right, pfun );
+        ( *pfun )( &root->item, wtVal );
+        
+        // Process left subtree
+        InOrder( root->left, pfun, wtVal );
     }
+}
+
+static double InOrderWtVal( Node* root )
+{
+    double wtVal = 0;
+
+    if ( root != NULL )
+    {
+        // Process right subtree
+        wtVal += InOrderWtVal( root->right );
+
+        // Process item in node
+        wtVal += root->item.wtVal;
+        
+        // Process left subtree
+        wtVal += InOrderWtVal( root->left );
+    }
+
+    return wtVal;
 }
 
 static void DeleteAllNodes( Node* root )
@@ -248,9 +290,7 @@ static void AddNode( Node* new_nodePt, Node* root )
 // i2 : address of item in current root node
 static int ToLeft( const Item* i1, const Item* i2 )
 {
-    int comp1;
-
-    if ( ( comp1 = strcmp( i1->val, i2->val ) ) < 0 )
+    if ( i1->intVal < i2->intVal )
         return TRUE;
     else 
         return FALSE;
@@ -264,9 +304,7 @@ static int ToLeft( const Item* i1, const Item* i2 )
 // i2 : address of item in current root node
 static int ToRight( const Item* i1, const Item* i2 )
 {
-    int comp1;
-
-    if ( ( comp1 = strcmp( i1->val, i2->val ) ) > 0 )
+    if ( i1->intVal > i2->intVal )
         return TRUE;
     else 
         return FALSE;
