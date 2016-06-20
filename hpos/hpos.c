@@ -17,11 +17,14 @@ extern VOID ReportError( LPCTSTR userMsg, DWORD exitCode, BOOL prtErrorMsg );
 void addLat( char* hemis, char* valStr, Tree* pt );
 void addLon( char* hemis, char* valStr, Tree* pt );
 void addAlt( char* valStr, Tree* pt );
-void showVals( Tree* pt );
 void fillWtVals( Tree* pt );
-void printItem( Item* item, int ctTot );
 void fillWtValItem( Item* item, int wt );
-double getWtTotVal( Tree* pt );
+double calcWtTotVal( Tree* pt );
+double fetchWtTotVal( Tree* pt );
+void showValsScreen( Tree* pt );
+void showValsCSV( Tree* pt );
+void printItemScr( Item* itemPt, int ctTot );
+void printItemCSV( Item* itemPt, int ctTot );
 
 int wmain( int argc, TCHAR* argv[] )
 {
@@ -185,29 +188,85 @@ int wmain( int argc, TCHAR* argv[] )
 
     // Calculate the weighted values
     // of each measurement (node)
+    // This can only be done after the total amount
+    // of measurements per value (node) is known
     fillWtVals( &latTree );
     fillWtVals( &lonTree );
     fillWtVals( &altTree );
 
     // Calculate accumulated weighted value
-    weightedTotLat = getWtTotVal( &latTree );
-    weightedTotLon = getWtTotVal( &lonTree );
-    weightedTotAlt = getWtTotVal( &altTree );
+    calcWtTotVal( &latTree );
+    calcWtTotVal( &lonTree );
+    calcWtTotVal( &altTree );
 
-    // Display Latitudes
-    wprintf_s( TEXT( "Lat,[ms],[deg],ct,ctTot,[deg]\n" ) );
-    showVals( &latTree );
-    wprintf_s( TEXT( ",,,,,%.8f\n\n" ), weightedTotLat );
+    // Calculate accumulated weighted value
+    weightedTotLat = fetchWtTotVal( &latTree );
+    weightedTotLon = fetchWtTotVal( &lonTree );
+    weightedTotAlt = fetchWtTotVal( &altTree );
+
+
+    //===================================================
+    // Output basic data to screen
+    // (useful for batch processing)
+    // Option: -b
+    //===================================================
+    wprintf_s( TEXT( "%.8f,%.8f,%.8f\n" ),
+        weightedTotLon, weightedTotLat, weightedTotAlt );
+
+
+    //===================================================
+    // Output detailed data to screen
+    // Option: -d
+    //===================================================
+    wprintf_s( TEXT( "\n" ) );
+
+    // Display lon values
+    wprintf_s( TEXT( "    %12s  %13s  %14s  %6s  %6s  %14s\n" ),
+        TEXT( "Lon" ), TEXT( "[ms]" ), TEXT( "[deg]" ),
+        TEXT( "ct" ), TEXT( "ctTot" ), TEXT( "[deg]" ) );
+    showValsScreen( &lonTree );
+    wprintf_s( TEXT( "%79.8f\n\n" ), fetchWtTotVal( &lonTree ) );
+
+    // Display lat values
+    wprintf_s( TEXT( "    %12s  %13s  %14s  %6s  %6s  %14s\n" ),
+        TEXT( "Lat" ), TEXT( "[ms]" ), TEXT( "[deg]" ),
+        TEXT( "ct" ), TEXT( "ctTot" ), TEXT( "[deg]" ) );
+    showValsScreen( &latTree );
+    wprintf_s( TEXT( "%79.8f\n\n" ), fetchWtTotVal( &latTree ) );
+
+    // Display alt values
+    wprintf_s( TEXT( "    %12s  %13s  %14s  %6s  %6s  %14s\n" ),
+        TEXT( "Alt" ), TEXT( "[dm]" ), TEXT( "[m]" ),
+        TEXT( "ct" ), TEXT( "ctTot" ), TEXT( "[m]" ) );
+    showValsScreen( &altTree );
+    wprintf_s( TEXT( "%79.8f\n\n\n" ), fetchWtTotVal( &altTree ) );
+    
+    
+    //===================================================
+    // Output detailed data to CSV file
+    // Option: -c
+    //===================================================
 
     // Display Longitudes
     wprintf_s( TEXT( "Lon,[ms],[deg],ct,ctTot,[deg]\n" ) );
-    showVals( &lonTree );
-    wprintf_s( TEXT( ",,,,,%.8f\n\n" ), weightedTotLon );
+    showValsCSV( &lonTree );
+    wprintf_s( TEXT( ",,,,,%.8f\n\n" ), fetchWtTotVal( &lonTree ) );
+    
+    // Display Latitudes
+    wprintf_s( TEXT( "Lat,[ms],[deg],ct,ctTot,[deg]\n" ) );
+    showValsCSV( &latTree );
+    wprintf_s( TEXT( ",,,,,%.8f\n\n" ), fetchWtTotVal( &latTree ) );
 
     // Display Altitudes
     wprintf_s( TEXT( "Alt,[dm],[m],ct,ctTot,[m]\n" ) );
-    showVals( &altTree );
-    wprintf_s( TEXT( ",,,,,%.1f\n\n" ), weightedTotAlt );
+    showValsCSV( &altTree );
+    wprintf_s( TEXT( ",,,,,%.8f\n\n" ), fetchWtTotVal( &altTree ) );
+
+
+    //===================================================
+    // Output placemark to KML file
+    // Option: -k
+    //===================================================
 
     // Generate .kml output
     wprintf_s( TEXT( "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" ) );
@@ -217,8 +276,10 @@ int wmain( int argc, TCHAR* argv[] )
     wprintf_s( TEXT( "    <name>%s</name>\n" ), fileName );
     wprintf_s( TEXT( "    <description>%s</description>\n" ), fileName );
     wprintf_s( TEXT( "    <Point>\n" ) );
-    wprintf_s( TEXT( "        <coordinates>%.8f,%.8f,%.1f</coordinates>\n" ),
-        weightedTotLon, weightedTotLat, weightedTotAlt );
+    wprintf_s( TEXT( "        <coordinates>%.8f,%.8f,%.8f</coordinates>\n" ),
+        fetchWtTotVal( &lonTree ),
+        fetchWtTotVal( &latTree ),
+        fetchWtTotVal( &altTree ) );
     wprintf_s( TEXT( "    </Point>\n" ) );
     wprintf_s( TEXT( "</Placemark>\n" ) );
     wprintf_s( TEXT( "</Document>\n" ) );
@@ -379,12 +440,20 @@ void addAlt( char* valStr, Tree* pt )
     }
 }
 
-void showVals( Tree* pt )
+void showValsScreen( Tree* pt )
 {
     if ( TreeIsEmpty( pt ) )
         puts( "No entries!" );
     else
-        Traverse( pt, printItem );
+        Traverse( pt, printItemScr );
+}
+
+void showValsCSV( Tree* pt )
+{
+    if ( TreeIsEmpty( pt ) )
+        puts( "No entries!" );
+    else
+        Traverse( pt, printItemCSV );
 }
 
 void fillWtVals( Tree* pt )
@@ -393,7 +462,15 @@ void fillWtVals( Tree* pt )
         Traverse( pt, fillWtValItem );
 }
 
-void printItem( Item* itemPt, int ctTot )
+void printItemScr( Item* itemPt, int ctTot )
+{
+    // Print values's details
+    printf( "    %12s  %13d  %14.8f  %6d  %6d  %14.8f\n",
+        itemPt->nmeaVal, itemPt->intVal, itemPt->dblVal,
+        itemPt->ct, ctTot, itemPt->wtVal );
+}
+
+void printItemCSV( Item* itemPt, int ctTot )
 {
     // Print values's details
     printf( "%s,%d,%.8f,%d,%d,%.8f\n",
@@ -407,10 +484,18 @@ void fillWtValItem( Item* itemPt, int wt )
     itemPt->wtVal = itemPt->dblVal * ( double )itemPt->ct / wt;
 }
 
-double getWtTotVal( Tree* pt )
+double calcWtTotVal( Tree* pt )
 {
     if ( !( TreeIsEmpty( pt ) ) )
         return TraverseWtVal( pt );
+    else
+        return 0;
+}
+
+double fetchWtTotVal( Tree* pt )
+{
+    if ( !( TreeIsEmpty( pt ) ) )
+        return pt->wtTotVal;
     else
         return 0;
 }

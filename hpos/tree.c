@@ -166,6 +166,8 @@ double TraverseWtVal( Tree* ptree )
     if ( ptree != NULL )
         res = InOrderWtVal( ptree->root );
 
+    ptree->wtTotVal = res;
+
     return res;
 }
 
@@ -196,14 +198,14 @@ static void InOrder( Node* root, void ( *pfun )( Item* itemPt, int val ),
 {
     if ( root != NULL )
     {
-        // Process right subtree
-        InOrder( root->right, pfun, wtVal );
+        // Process left subtree
+        InOrder( root->left, pfun, wtVal );
 
         // Process item in node
         ( *pfun )( &root->item, wtVal );
         
-        // Process left subtree
-        InOrder( root->left, pfun, wtVal );
+        // Process right subtree
+        InOrder( root->right, pfun, wtVal );
     }
 }
 
@@ -213,14 +215,14 @@ static double InOrderWtVal( Node* root )
 
     if ( root != NULL )
     {
-        // Process right subtree
-        wtVal += InOrderWtVal( root->right );
+        // Process left subtree
+        wtVal += InOrderWtVal( root->left );
 
         // Process item in node
         wtVal += root->item.wtVal;
         
-        // Process left subtree
-        wtVal += InOrderWtVal( root->left );
+        // Process right subtree
+        wtVal += InOrderWtVal( root->right );
     }
 
     return wtVal;
