@@ -29,7 +29,6 @@ void printItemCSV( Item* itemPt, int ctTot, HANDLE hOut );
 void outBasic( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt );
 void outDetail( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt );
 void outCVS( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName );
-void outKML( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName );
 int txtToFile( CHAR* txtInPt, DWORD sizeBuf, HANDLE hOut );
 
 int wmain( int argc, TCHAR* argv[] )
@@ -235,15 +234,11 @@ int wmain( int argc, TCHAR* argv[] )
 
     // Output detailed data to screen
     // Option: -d
-    outDetail( &lonTree, &latTree, &altTree );
+//    outDetail( &lonTree, &latTree, &altTree );
     
     // Output detailed data to CSV file
     // Option: -c
-    outCVS( &lonTree, &latTree, &altTree, fileName );
-
-    // Output placemark to KML file
-    // Option: -k
-    outKML( &lonTree, &latTree, &altTree, fileName );
+//    outCVS( &lonTree, &latTree, &altTree, fileName );
 
 
     //==============================================
@@ -475,7 +470,7 @@ double fetchWtTotVal( Tree* pt )
 
 void outBasic( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt )
 {
-    wprintf_s( TEXT( "%.8f,%.8f,%.8f\n" ),
+    wprintf_s( TEXT( "%.8f,%.8f,%.8f" ),
         fetchWtTotVal( ptTrLon ),
         fetchWtTotVal( ptTrLat ),
         fetchWtTotVal( ptTrAlt ) );
@@ -504,7 +499,7 @@ void outDetail( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt )
         TEXT( "Alt" ), TEXT( "[dm]" ), TEXT( "[m]" ),
         TEXT( "ct" ), TEXT( "ctTot" ), TEXT( "[m]" ) );
     showValsScreen( ptTrAlt, GetStdHandle( STD_OUTPUT_HANDLE ) );
-    wprintf_s( TEXT( "%79.8f\n\n\n" ), fetchWtTotVal( ptTrAlt ) );
+    wprintf_s( TEXT( "%79.8f\n" ), fetchWtTotVal( ptTrAlt ) );
 }
 
 void outCVS( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName )
@@ -563,25 +558,6 @@ void outCVS( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName )
 
     // Close handle
     CloseHandle( hFileOut );
-}
-
-void outKML( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName )
-{
-    wprintf_s( TEXT( "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" ) );
-    wprintf_s( TEXT( "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n" ) );
-    wprintf_s( TEXT( "<Document>\n" ) );
-    wprintf_s( TEXT( "<Placemark>\n" ) );
-    wprintf_s( TEXT( "    <name>%s</name>\n" ), fName );
-    wprintf_s( TEXT( "    <description>%s</description>\n" ), fName );
-    wprintf_s( TEXT( "    <Point>\n" ) );
-    wprintf_s( TEXT( "        <coordinates>%.8f,%.8f,%.8f</coordinates>\n" ),
-        fetchWtTotVal( ptTrLon ),
-        fetchWtTotVal( ptTrLat ),
-        fetchWtTotVal( ptTrAlt ) );
-    wprintf_s( TEXT( "    </Point>\n" ) );
-    wprintf_s( TEXT( "</Placemark>\n" ) );
-    wprintf_s( TEXT( "</Document>\n" ) );
-    wprintf_s( TEXT( "</kml>\n\n" ) );
 }
 
 int txtToFile( CHAR* txtInPt, DWORD sizeBuf, HANDLE hOut )
