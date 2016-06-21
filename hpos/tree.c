@@ -23,8 +23,9 @@ static Node* MakeNode( const Item* pi );
 static int ToLeft( const Item* i1, const Item* i2 );
 static int ToRight( const Item* i1, const Item* i2 );
 static void AddNode( Node* new_nodePt, Node* root );
-static void InOrder( Node* root, void ( *pfun )( Item* itemPt, int val ),
-    int wtVal );
+static void InOrder( Node* root,
+    void ( *pfun )( Item* itemPt, int val, HANDLE hOut ),
+    int wtVal, HANDLE hOut );
 static double InOrderWtVal( Node* root );
 static Pair SeekItem( const Item* pi, const Tree* ptree );
 static void DeleteNode( Node** ptr );
@@ -153,10 +154,11 @@ int DeleteItem( const Item* pi, Tree* ptree )
     return TRUE;
 }
 
-void Traverse( Tree* ptree, void ( *pfun )( Item* itemPt, int val ) )
+void Traverse( Tree* ptree,
+    void ( *pfun )( Item* itemPt, int val, HANDLE hOut ), HANDLE hOut )
 {
     if ( ptree != NULL )
-        InOrder( ptree->root, pfun, ptree->ctTotMeas );
+        InOrder( ptree->root, pfun, ptree->ctTotMeas, hOut );
 }
 
 double TraverseWtVal( Tree* ptree )
@@ -193,19 +195,20 @@ void DeleteAll( Tree* ptree )
 
 
 /* local functions */
-static void InOrder( Node* root, void ( *pfun )( Item* itemPt, int val ),
-    int wtVal )
+static void InOrder( Node* root,
+    void ( *pfun )( Item* itemPt, int val, HANDLE hOut ),
+    int wtVal, HANDLE hOut )
 {
     if ( root != NULL )
     {
         // Process left subtree
-        InOrder( root->left, pfun, wtVal );
+        InOrder( root->left, pfun, wtVal, hOut );
 
         // Process item in node
-        ( *pfun )( &root->item, wtVal );
+        ( *pfun )( &root->item, wtVal, hOut );
         
         // Process right subtree
-        InOrder( root->right, pfun, wtVal );
+        InOrder( root->right, pfun, wtVal, hOut );
     }
 }
 

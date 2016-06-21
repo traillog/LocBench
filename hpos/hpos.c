@@ -10,6 +10,7 @@
 #define     ERRMSG      256
 #define     FNAME       260
 #define     LINEIN      128
+#define     LINEOUT     256
 #define     VALIN       32
 
 extern VOID ReportError( LPCTSTR userMsg, DWORD exitCode, BOOL prtErrorMsg );
@@ -18,17 +19,24 @@ void addLat( char* hemis, char* valStr, Tree* pt );
 void addLon( char* hemis, char* valStr, Tree* pt );
 void addAlt( char* valStr, Tree* pt );
 void fillWtVals( Tree* pt );
-void fillWtValItem( Item* item, int wt );
+void fillWtValItem( Item* itemPt, int wt, HANDLE hOut );
 double calcWtTotVal( Tree* pt );
 double fetchWtTotVal( Tree* pt );
-void showValsScreen( Tree* pt );
-void showValsCSV( Tree* pt );
-void printItemScr( Item* itemPt, int ctTot );
-void printItemCSV( Item* itemPt, int ctTot );
+void showValsScreen( Tree* pt, HANDLE hOut );
+void showValsCSV( Tree* pt, HANDLE hOut );
+void printItemScr( Item* itemPt, int ctTot, HANDLE hOut );
+void printItemCSV( Item* itemPt, int ctTot, HANDLE hOut );
+void outBasic( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt );
+void outDetail( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt );
+void outCVS( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName );
+void outKML( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName );
+int txtToFile( CHAR* txtInPt, DWORD sizeBuf, HANDLE hOut );
 
 int wmain( int argc, TCHAR* argv[] )
 {
+    //==============================================
     // Vars definitions
+    //==============================================
     FILE *inNMEA = NULL;
     TCHAR errMsg[ ERRMSG ] = { 0 };
     char inputLine[ LINEIN ] = { 0 };
@@ -50,10 +58,11 @@ int wmain( int argc, TCHAR* argv[] )
     Tree lonTree;
     Tree altTree;
 
-    double weightedTotLat = 0;
-    double weightedTotLon = 0;
-    double weightedTotAlt = 0;
 
+    //==============================================
+    // Parse arguments and options
+    //==============================================
+    
     // Validate args count
     if ( argc != 2 )
     {
@@ -62,7 +71,7 @@ int wmain( int argc, TCHAR* argv[] )
         return 1;
     }
 
-    // Open 'NMEA' input file
+    // Open nmea file
     if ( _wfopen_s( &inNMEA, argv[ 1 ], TEXT( "r" ) ) != 0 )
     {
         wmemset( errMsg, 0, _countof( errMsg ) );
@@ -73,21 +82,23 @@ int wmain( int argc, TCHAR* argv[] )
     }
 
     // Retrieve file name
-    wchPt = wcsrchr( argv[ 1 ], L'\\' );
-
-    if ( wchPt != NULL )
-        wcscpy_s( fileName, _countof( fileName ), wchPt + 1 );
-    else
-        wcscpy_s( fileName, _countof( fileName ), argv[ 1 ] );
-
-    wchPt = wcschr( fileName, L'.' );
+    wcscpy_s( fileName, _countof( fileName ), argv[ 1 ] );
+    wchPt = wcsrchr( fileName, L'.' );
     *wchPt = L'\0';
 
+
+    //==============================================
     // Initialize storage trees
+    //==============================================
     InitializeTree( &latTree );
     InitializeTree( &lonTree );
     InitializeTree( &altTree );
 
+
+    //==============================================
+    // Parse nmea file
+    //==============================================
+    
     // Reset input line buffer
     memset( inputLine, 0, _countof( inputLine ) );
 
@@ -95,8 +106,7 @@ int wmain( int argc, TCHAR* argv[] )
     while ( fscanf_s( inNMEA, "%127s", inputLine,
         _countof( inputLine ) - 1 ) == 1 )
     {
-        // Process only 'GGA' messages
-        if ( strstr( inputLine, "$GPGGA" ) )
+        if ( strstr( inputLine, "$GPGGA" ) )        // Catch 'GGA' messages
         {
             // Reset field counter
             fieldNo = 0;
@@ -118,7 +128,10 @@ int wmain( int argc, TCHAR* argv[] )
                 else if ( fieldNo == 5 )
                     strcpy_s( hemiEW, _countof( hemiEW ), ptMsg );
                 else if ( fieldNo == 9 )
+                {
                     strcpy_s( tmpAlt, _countof( tmpAlt ), ptMsg );
+                    break;      // Skip the rest of the fields
+                }
 
                 // Locate next field (token)
                 ptMsg = strtok_s( NULL, ",*", &nextptMsg );
@@ -127,7 +140,7 @@ int wmain( int argc, TCHAR* argv[] )
                 ++fieldNo;
             }
         }
-        else if ( strstr( inputLine, "$GPRMC" ) )
+        else if ( strstr( inputLine, "$GPRMC" ) )   // Catch 'RMC' messages
         {
             // Reset field counter
             fieldNo = 0;
@@ -141,7 +154,10 @@ int wmain( int argc, TCHAR* argv[] )
                 // Store value in tree
                 // If already in tree, then update counters
                 if ( fieldNo == 2 )
+                {
                     strcpy_s( status, _countof( status ), ptMsg );
+                    break;      // Skip the rest of the fields
+                }
 
                 // Locate next field (token)
                 ptMsg = strtok_s( NULL, ",*", &nextptMsg );
@@ -176,7 +192,10 @@ int wmain( int argc, TCHAR* argv[] )
         memset( inputLine, 0, _countof( inputLine ) );
     }
 
-    // Close input nmea file
+    
+    //==============================================
+    // Close nmea file
+    //==============================================
     if ( fclose( inNMEA ) != 0 )
     {
         wmemset( errMsg, 0, _countof( errMsg ) );
@@ -186,106 +205,50 @@ int wmain( int argc, TCHAR* argv[] )
         return 1;
     }
 
-    // Calculate the weighted values
-    // of each measurement (node)
-    // This can only be done after the total amount
-    // of measurements per value (node) is known
+
+    //==============================================
+    // Calculate weighted results
+    // This can only be done after all measurements
+    // were processed, so that the amount of
+    // measurements per value (node) is known
+    //==============================================
+    
+    // Calc weighted value per node
     fillWtVals( &latTree );
     fillWtVals( &lonTree );
     fillWtVals( &altTree );
 
-    // Calculate accumulated weighted value
+    // Calc total accumulated weighted value
     calcWtTotVal( &latTree );
     calcWtTotVal( &lonTree );
     calcWtTotVal( &altTree );
 
-    // Calculate accumulated weighted value
-    weightedTotLat = fetchWtTotVal( &latTree );
-    weightedTotLon = fetchWtTotVal( &lonTree );
-    weightedTotAlt = fetchWtTotVal( &altTree );
 
+    //==============================================
+    // Output results
+    //==============================================
 
-    //===================================================
     // Output basic data to screen
     // (useful for batch processing)
     // Option: -b
-    //===================================================
-    wprintf_s( TEXT( "%.8f,%.8f,%.8f\n" ),
-        weightedTotLon, weightedTotLat, weightedTotAlt );
+    outBasic( &lonTree, &latTree, &altTree );
 
-
-    //===================================================
     // Output detailed data to screen
     // Option: -d
-    //===================================================
-    wprintf_s( TEXT( "\n" ) );
-
-    // Display lon values
-    wprintf_s( TEXT( "    %12s  %13s  %14s  %6s  %6s  %14s\n" ),
-        TEXT( "Lon" ), TEXT( "[ms]" ), TEXT( "[deg]" ),
-        TEXT( "ct" ), TEXT( "ctTot" ), TEXT( "[deg]" ) );
-    showValsScreen( &lonTree );
-    wprintf_s( TEXT( "%79.8f\n\n" ), fetchWtTotVal( &lonTree ) );
-
-    // Display lat values
-    wprintf_s( TEXT( "    %12s  %13s  %14s  %6s  %6s  %14s\n" ),
-        TEXT( "Lat" ), TEXT( "[ms]" ), TEXT( "[deg]" ),
-        TEXT( "ct" ), TEXT( "ctTot" ), TEXT( "[deg]" ) );
-    showValsScreen( &latTree );
-    wprintf_s( TEXT( "%79.8f\n\n" ), fetchWtTotVal( &latTree ) );
-
-    // Display alt values
-    wprintf_s( TEXT( "    %12s  %13s  %14s  %6s  %6s  %14s\n" ),
-        TEXT( "Alt" ), TEXT( "[dm]" ), TEXT( "[m]" ),
-        TEXT( "ct" ), TEXT( "ctTot" ), TEXT( "[m]" ) );
-    showValsScreen( &altTree );
-    wprintf_s( TEXT( "%79.8f\n\n\n" ), fetchWtTotVal( &altTree ) );
+    outDetail( &lonTree, &latTree, &altTree );
     
-    
-    //===================================================
     // Output detailed data to CSV file
     // Option: -c
-    //===================================================
+    outCVS( &lonTree, &latTree, &altTree, fileName );
 
-    // Display Longitudes
-    wprintf_s( TEXT( "Lon,[ms],[deg],ct,ctTot,[deg]\n" ) );
-    showValsCSV( &lonTree );
-    wprintf_s( TEXT( ",,,,,%.8f\n\n" ), fetchWtTotVal( &lonTree ) );
-    
-    // Display Latitudes
-    wprintf_s( TEXT( "Lat,[ms],[deg],ct,ctTot,[deg]\n" ) );
-    showValsCSV( &latTree );
-    wprintf_s( TEXT( ",,,,,%.8f\n\n" ), fetchWtTotVal( &latTree ) );
-
-    // Display Altitudes
-    wprintf_s( TEXT( "Alt,[dm],[m],ct,ctTot,[m]\n" ) );
-    showValsCSV( &altTree );
-    wprintf_s( TEXT( ",,,,,%.8f\n\n" ), fetchWtTotVal( &altTree ) );
-
-
-    //===================================================
     // Output placemark to KML file
     // Option: -k
-    //===================================================
+    outKML( &lonTree, &latTree, &altTree, fileName );
 
-    // Generate .kml output
-    wprintf_s( TEXT( "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" ) );
-    wprintf_s( TEXT( "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n" ) );
-    wprintf_s( TEXT( "<Document>\n" ) );
-    wprintf_s( TEXT( "<Placemark>\n" ) );
-    wprintf_s( TEXT( "    <name>%s</name>\n" ), fileName );
-    wprintf_s( TEXT( "    <description>%s</description>\n" ), fileName );
-    wprintf_s( TEXT( "    <Point>\n" ) );
-    wprintf_s( TEXT( "        <coordinates>%.8f,%.8f,%.8f</coordinates>\n" ),
-        fetchWtTotVal( &lonTree ),
-        fetchWtTotVal( &latTree ),
-        fetchWtTotVal( &altTree ) );
-    wprintf_s( TEXT( "    </Point>\n" ) );
-    wprintf_s( TEXT( "</Placemark>\n" ) );
-    wprintf_s( TEXT( "</Document>\n" ) );
-    wprintf_s( TEXT( "</kml>\n\n" ) );
 
+    //==============================================
     // Destroy storage trees
+    //==============================================
     DeleteAll( &latTree );
     DeleteAll( &lonTree );
     DeleteAll( &altTree );
@@ -440,45 +403,55 @@ void addAlt( char* valStr, Tree* pt )
     }
 }
 
-void showValsScreen( Tree* pt )
+void showValsScreen( Tree* pt, HANDLE hOut )
 {
     if ( TreeIsEmpty( pt ) )
         puts( "No entries!" );
     else
-        Traverse( pt, printItemScr );
+        Traverse( pt, printItemScr, hOut );
 }
 
-void showValsCSV( Tree* pt )
+void showValsCSV( Tree* pt, HANDLE hOut )
 {
     if ( TreeIsEmpty( pt ) )
         puts( "No entries!" );
     else
-        Traverse( pt, printItemCSV );
+        Traverse( pt, printItemCSV, hOut );
 }
 
 void fillWtVals( Tree* pt )
 {
     if ( !( TreeIsEmpty( pt ) ) )
-        Traverse( pt, fillWtValItem );
+        Traverse( pt, fillWtValItem, NULL );
 }
 
-void printItemScr( Item* itemPt, int ctTot )
+void printItemScr( Item* itemPt, int ctTot, HANDLE hOut )
 {
+    CHAR bufOut[ LINEOUT ] = { 0 };
+
     // Print values's details
-    printf( "    %12s  %13d  %14.8f  %6d  %6d  %14.8f\n",
+    sprintf_s( bufOut, _countof( bufOut ),
+        "    %12s  %13d  %14.8f  %6d  %6d  %14.8f\n",
         itemPt->nmeaVal, itemPt->intVal, itemPt->dblVal,
         itemPt->ct, ctTot, itemPt->wtVal );
+
+    txtToFile( bufOut, _countof( bufOut ), hOut );
 }
 
-void printItemCSV( Item* itemPt, int ctTot )
+void printItemCSV( Item* itemPt, int ctTot, HANDLE hOut )
 {
-    // Print values's details
-    printf( "%s,%d,%.8f,%d,%d,%.8f\n",
+    CHAR bufOut[ LINEOUT ] = { 0 };
+
+    // Print values's details to CSV file
+    sprintf_s( bufOut, _countof( bufOut ),
+        "%s,%d,%.8f,%d,%d,%.8f\n",
         itemPt->nmeaVal, itemPt->intVal, itemPt->dblVal, itemPt->ct,
         ctTot, itemPt->wtVal );
+
+    txtToFile( bufOut, _countof( bufOut ), hOut );
 }
 
-void fillWtValItem( Item* itemPt, int wt )
+void fillWtValItem( Item* itemPt, int wt, HANDLE hOut )
 {
     // Fill in the item's weighted value
     itemPt->wtVal = itemPt->dblVal * ( double )itemPt->ct / wt;
@@ -500,7 +473,141 @@ double fetchWtTotVal( Tree* pt )
         return 0;
 }
 
-void genCSV( double lat, double lon, double alt, TCHAR* fName )
+void outBasic( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt )
 {
+    wprintf_s( TEXT( "%.8f,%.8f,%.8f\n" ),
+        fetchWtTotVal( ptTrLon ),
+        fetchWtTotVal( ptTrLat ),
+        fetchWtTotVal( ptTrAlt ) );
+}
 
+void outDetail( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt )
+{
+    wprintf_s( TEXT( "\n" ) );
+
+    // Display lon values
+    wprintf_s( TEXT( "    %12s  %13s  %14s  %6s  %6s  %14s\n" ),
+        TEXT( "Lon" ), TEXT( "[ms]" ), TEXT( "[deg]" ),
+        TEXT( "ct" ), TEXT( "ctTot" ), TEXT( "[deg]" ) );
+    showValsScreen( ptTrLon, GetStdHandle( STD_OUTPUT_HANDLE ) );
+    wprintf_s( TEXT( "%79.8f\n\n" ), fetchWtTotVal( ptTrLon ) );
+
+    // Display lat values
+    wprintf_s( TEXT( "    %12s  %13s  %14s  %6s  %6s  %14s\n" ),
+        TEXT( "Lat" ), TEXT( "[ms]" ), TEXT( "[deg]" ),
+        TEXT( "ct" ), TEXT( "ctTot" ), TEXT( "[deg]" ) );
+    showValsScreen( ptTrLat, GetStdHandle( STD_OUTPUT_HANDLE ) );
+    wprintf_s( TEXT( "%79.8f\n\n" ), fetchWtTotVal( ptTrLat ) );
+
+    // Display alt values
+    wprintf_s( TEXT( "    %12s  %13s  %14s  %6s  %6s  %14s\n" ),
+        TEXT( "Alt" ), TEXT( "[dm]" ), TEXT( "[m]" ),
+        TEXT( "ct" ), TEXT( "ctTot" ), TEXT( "[m]" ) );
+    showValsScreen( ptTrAlt, GetStdHandle( STD_OUTPUT_HANDLE ) );
+    wprintf_s( TEXT( "%79.8f\n\n\n" ), fetchWtTotVal( ptTrAlt ) );
+}
+
+void outCVS( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName )
+{
+    HANDLE hFileOut;
+    TCHAR fNameTot[ FNAME ] = { 0 };
+    CHAR bufOut[ LINEOUT ] = { 0 };
+
+    // Set up complete file name (name + ext)
+    wcscpy_s( fNameTot, _countof( fNameTot ), fName );
+    wcscat_s( fNameTot, _countof( fNameTot ), TEXT( ".csv" ) );
+
+    // Open output file
+    hFileOut = CreateFile( fNameTot, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL, NULL );
+
+    // Validate output handle
+    if ( hFileOut == INVALID_HANDLE_VALUE )
+    {
+        ReportError( TEXT( "Open output file failed." ), 0, TRUE );
+        return;
+    }
+
+    // Display Longitudes
+    sprintf_s( bufOut, _countof( bufOut ), "%s",
+        "Lon,[ms],[deg],ct,ctTot,[deg]\n" );
+    txtToFile( bufOut, _countof( bufOut ), hFileOut );
+
+    showValsCSV( ptTrLon, hFileOut );
+
+    sprintf_s( bufOut, _countof( bufOut ), ",,,,,%.8f\n\n",
+        fetchWtTotVal( ptTrLon ) );
+    txtToFile( bufOut, _countof( bufOut ), hFileOut );
+    
+    // Display Latitudes
+    sprintf_s( bufOut, _countof( bufOut ), "%s",
+        "Lat,[ms],[deg],ct,ctTot,[deg]\n" );
+    txtToFile( bufOut, _countof( bufOut ), hFileOut );
+
+    showValsCSV( ptTrLat, hFileOut );
+
+    sprintf_s( bufOut, _countof( bufOut ), ",,,,,%.8f\n\n",
+        fetchWtTotVal( ptTrLat ) );
+    txtToFile( bufOut, _countof( bufOut ), hFileOut );
+
+    // Display Altitudes
+    sprintf_s( bufOut, _countof( bufOut ), "%s",
+        "Alt,[dm],[m],ct,ctTot,[m]\n" );
+    txtToFile( bufOut, _countof( bufOut ), hFileOut );
+
+    showValsCSV( ptTrAlt, hFileOut );
+
+    sprintf_s( bufOut, _countof( bufOut ), ",,,,,%.8f\n\n",
+        fetchWtTotVal( ptTrAlt ) );
+    txtToFile( bufOut, _countof( bufOut ), hFileOut );
+
+    // Close handle
+    CloseHandle( hFileOut );
+}
+
+void outKML( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName )
+{
+    wprintf_s( TEXT( "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" ) );
+    wprintf_s( TEXT( "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n" ) );
+    wprintf_s( TEXT( "<Document>\n" ) );
+    wprintf_s( TEXT( "<Placemark>\n" ) );
+    wprintf_s( TEXT( "    <name>%s</name>\n" ), fName );
+    wprintf_s( TEXT( "    <description>%s</description>\n" ), fName );
+    wprintf_s( TEXT( "    <Point>\n" ) );
+    wprintf_s( TEXT( "        <coordinates>%.8f,%.8f,%.8f</coordinates>\n" ),
+        fetchWtTotVal( ptTrLon ),
+        fetchWtTotVal( ptTrLat ),
+        fetchWtTotVal( ptTrAlt ) );
+    wprintf_s( TEXT( "    </Point>\n" ) );
+    wprintf_s( TEXT( "</Placemark>\n" ) );
+    wprintf_s( TEXT( "</Document>\n" ) );
+    wprintf_s( TEXT( "</kml>\n\n" ) );
+}
+
+int txtToFile( CHAR* txtInPt, DWORD sizeBuf, HANDLE hOut )
+{
+    DWORD txtLen, nOut;
+
+    // Calc amount of bytes to output
+    txtLen = strnlen( txtInPt, sizeBuf );
+    
+    // Validate text buffer null termination
+    if ( txtLen >= sizeBuf )
+    {
+        // String not null terminated -> terminate output
+        fprintf( stderr, "String length error.\n" );
+        return 1;
+    }
+
+    // Write text to file
+    WriteFile( hOut, txtInPt, txtLen, &nOut, NULL );
+
+    // Validate bytes 'to output' vs 'output' bytes
+    if ( txtLen != nOut )
+    {
+        ReportError( TEXT( "Output to file failed." ), 0, TRUE );
+        return 1;
+    }
+
+    return 0;
 }

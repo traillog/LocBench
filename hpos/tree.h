@@ -12,6 +12,8 @@
 #ifndef _TREE_H_
 #define _TREE_H_
 
+#include <windows.h>
+
 #define     FALSE       0
 #define     TRUE        1
 
@@ -97,7 +99,8 @@ int DeleteItem( const Item* pi, Tree* ptree );
 /*                 value                               */
 /* postcondition:  the function pointed to by pfun is  */
 /*                 executed once for each item in tree */
-void Traverse( Tree* ptree, void ( *pfun )( Item* itemPt, int val ) );
+void Traverse( Tree* ptree,
+    void ( *pfun )( Item* itemPt, int val, HANDLE hOut ), HANDLE hOut );
 
 /* operation:      get total weighted value from tree  */
 /* preconditions:  ptree points to a tree              */
