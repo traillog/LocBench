@@ -67,3 +67,8 @@ hpos/Release/hpos.exe.intermediate.manifest
 *.xls
 *.csv
 *.kml
+jdots/Debug/jdots.exe.embed.manifest
+jdots/Debug/jdots.exe.embed.manifest.res
+jdots/Debug/jdots_manifest.rc
+jdots/Debug/jdots.exe.intermediate.manifest
+jdots/Release/jdots.exe.intermediate.manifest

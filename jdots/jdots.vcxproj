@@ -11,9 +11,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{ECA052BC-F5EB-4E84-9C66-8499D4E6E4C5}</ProjectGuid>
+    <ProjectGuid>{A4CC0A8B-F847-4D5B-893E-BAF88E4056D1}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>hpos</RootNamespace>
+    <RootNamespace>jdots</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -76,12 +76,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\common\list.c" />
     <ClCompile Include="..\common\repError.c" />
-    <ClCompile Include="..\common\tree.c" />
-    <ClCompile Include="hpos.c" />
+    <ClCompile Include="jdots.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\common\tree.h" />
+    <ClInclude Include="..\common\list.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

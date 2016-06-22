@@ -15,18 +15,18 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="hpos.c">
+    <ClCompile Include="jdots.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\list.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\common\repError.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\common\tree.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\common\tree.h">
+    <ClInclude Include="..\common\list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
