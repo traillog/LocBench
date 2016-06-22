@@ -238,7 +238,7 @@ int wmain( int argc, TCHAR* argv[] )
     
     // Output detailed data to CSV file
     // Option: -c
-//    outCVS( &lonTree, &latTree, &altTree, fileName );
+    outCVS( &lonTree, &latTree, &altTree, fileName );
 
 
     //==============================================
