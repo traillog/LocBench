@@ -10,6 +10,7 @@
 #include "list.h"               // Definition list ADT
 
 #define     MAX_OPTIONS     20  // Max # command line options
+#define     CMDBUF          256
 
 // Flags indices
 #define     FL_HELP         0   // Print usage
@@ -22,6 +23,7 @@ int cmpItemsName( Item* pItemN, Item* pItemM );
 void showResults( List* resultsList, Item* resultsLevel );
 void showItem( Item* pItem );
 void sepThousands( const long long* numPt, TCHAR* acc, size_t elemsAcc );
+BOOL procNmeaFile( TCHAR* fName, TCHAR* cdsOut, int cdsSize );
 
 int wmain( int argc, LPTSTR argv[] )
 {
@@ -120,6 +122,10 @@ int wmain( int argc, LPTSTR argv[] )
 
         // Display sorted results
         showResults( &resultsList, &resultsItem );
+
+        // Generate KML file
+//        outputKml(  );
+
     }
 
     // Housekeeping
@@ -189,13 +195,6 @@ BOOL scanDir( LPTSTR tDir, List* resList, Item* parentItem )
             {
                 // File found
 
-                // Increment files count of parent
-                ++parentItem->filesCount.QuadPart;
-
-                // Current item has one file
-                currentItem.filesCount.QuadPart = 1;
-
-
                 // Update last write time information of the parent.
                 // Is current item's LastWriteTime later
                 // than parent's LastWriteTime ?
@@ -221,6 +220,14 @@ BOOL scanDir( LPTSTR tDir, List* resList, Item* parentItem )
                 // Update parent file size
                 parentItem->findInfo.nFileSizeLow = parentSize.LowPart;
                 parentItem->findInfo.nFileSizeHigh = parentSize.HighPart;
+
+                // Apply external tool hpos on current file
+                if ( procNmeaFile( currentItem.findInfo.cFileName,
+                    currentItem.coords, COORDS ) == FALSE )
+                {
+                    wprintf_s( TEXT( "Processing NMEA file failed\n" ) );
+                    return FALSE;
+                }
 
                 // Append current item to results list
                 if ( AddItem( currentItem, resList ) == false )
@@ -266,33 +273,27 @@ int cmpItemsName( Item* pItemN, Item* pItemM )
 void showResults( List* resultsList, Item* resultsLevel )
 {
     // Display header
-    wprintf_s( TEXT( "    %19s %5s %10s %10s %18s %s\n" ),
+    wprintf_s( TEXT( "    %19s %47s %12s %s\n" ),
         TEXT( "Date Modified" ),
-        TEXT( "Type" ),
-        TEXT( "Dirs" ),
-        TEXT( "Files" ),
+        TEXT( "Coords" ),
         TEXT( "Size" ),
         TEXT( "Name" ) );
 
-    wprintf_s( TEXT( "    %19s %5s %10s %10s %18s %s\n" ),
+    wprintf_s( TEXT( "    %19s %47s %12s %s\n" ),
         TEXT( "-------------------" ),
-        TEXT( "-----" ),
-        TEXT( "----------" ),
-        TEXT( "----------" ),
-        TEXT( "------------------" ),
-        TEXT( "---------------------------------------------" ) );
+        TEXT( "-----------------------------------------------" ),
+        TEXT( "------------" ),
+        TEXT( "--------------------------------" ) );
 
     // Display founded entries
     Traverse( resultsList, showItem );
 
     // Display totals
-    wprintf_s( TEXT( "    %19s %5s %10s %10s %18s %s\n" ),
+    wprintf_s( TEXT( "    %19s %47s %12s %s\n" ),
         TEXT( "-------------------" ),
-        TEXT( "-----" ),
-        TEXT( "----------" ),
-        TEXT( "----------" ),
-        TEXT( "------------------" ),
-        TEXT( "---------------------------------------------" ) );
+        TEXT( "-----------------------------------------------" ),
+        TEXT( "------------" ),
+        TEXT( "--------------------------------" ) );
 
     showItem( resultsLevel );
 }
@@ -302,8 +303,6 @@ void showItem( Item* pItem )
     FILETIME lastWriteFTIME;
     SYSTEMTIME lastWriteSYSTIME;
     LARGE_INTEGER entrySize;
-    TCHAR dirsCtStr[ 32 ] = { 0 };
-    TCHAR filesCtStr[ 32 ] = { 0 };
     TCHAR sizeStr[ 32 ] = { 0 };
 
     // Fetch and prepare entry last modification date & time
@@ -324,30 +323,19 @@ void showItem( Item* pItem )
         lastWriteSYSTIME.wMinute,
         lastWriteSYSTIME.wSecond );
 
-    // Disp entry type (dir/file)
-    if ( pItem->findInfo.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT )
-        wprintf_s( TEXT( " %5s" ), TEXT( "<LIN>" ) );
-    else if ( pItem->findInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
-        wprintf_s( TEXT( " %5s" ), TEXT( "<DIR>" ) );
-    else
-        wprintf_s( TEXT( " %5s" ), TEXT( "     " ) );
+    // Disp coords
+    wprintf_s( TEXT( " %47s" ), pItem->coords );
 
     // Fetch entry size
     entrySize.LowPart = pItem->findInfo.nFileSizeLow;
     entrySize.HighPart = pItem->findInfo.nFileSizeHigh;
 
     // Convert nums to strings (thousands separated)
-    sepThousands( &pItem->dirsCount.QuadPart, dirsCtStr,
-        _countof( dirsCtStr ) );
-    sepThousands( &pItem->filesCount.QuadPart, filesCtStr,
-        _countof( filesCtStr ) );
     sepThousands( &entrySize.QuadPart, sizeStr,
         _countof( sizeStr ) );
 
     // Disp entry details
-    wprintf_s( TEXT( " %10s %10s %18s %s\n" ),
-        dirsCtStr,
-        filesCtStr,
+    wprintf_s( TEXT( "%13s %s\n" ),
         sizeStr,
         pItem->findInfo.cFileName );
 }
@@ -388,4 +376,41 @@ void sepThousands( const long long* numPt, TCHAR* acc, size_t elemsAcc )
             wcscpy_s( acc, elemsAcc, app );
         }
     }
+}
+
+BOOL procNmeaFile( TCHAR* fName, TCHAR* cdsOut, int cdsSize )
+{
+    TCHAR cmdBuffer[ CMDBUF ] = { 0 };
+    FILE* pPipe = NULL;
+    BOOL result = TRUE;
+
+    // Set up external command
+    swprintf_s( cmdBuffer, _countof( cmdBuffer ), TEXT( "%s %s" ),
+        TEXT( "C:\\tmp\\myTools\\hpos.exe" ),
+        fName );
+
+    // Create pipe (read text mode) and execute external program
+    if ( ( pPipe = _wpopen( cmdBuffer, TEXT( "rt" ) ) ) == NULL )
+        return FALSE;
+
+    // Reset output buffer
+    wmemset( cdsOut, 0, cdsSize );
+
+    // Read pipe until end of file, or an error occurs.
+    // hpos outputs only one line of text
+    while ( fgetws( cdsOut, cdsSize, pPipe ) )
+    {
+        ;
+    }
+
+    // Close pipe and print return value of pPipe.
+    if ( feof( pPipe ) )
+        _pclose( pPipe );
+    else
+    {
+        wprintf_s( TEXT( "Failed to read pipe for 'hpos' to the end.\n" ) );
+        result = FALSE;
+    }
+
+    return result;
 }

@@ -15,13 +15,14 @@
 #define     false       0
 #define     true        1
 
+#define     COORDS      64
+
 //================================================================
 // program-specific declarations
 //================================================================
 struct scanOut
 {
-    LARGE_INTEGER dirsCount;
-    LARGE_INTEGER filesCount;
+    TCHAR coords[ COORDS ];
     WIN32_FIND_DATA findInfo;
 };
 
