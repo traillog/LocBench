@@ -24,6 +24,10 @@ void showResults( List* resultsList, Item* resultsLevel );
 void showItem( Item* pItem );
 void sepThousands( const long long* numPt, TCHAR* acc, size_t elemsAcc );
 BOOL procNmeaFile( TCHAR* fName, TCHAR* cdsOut, int cdsSize );
+void outputKml( List* plist );
+void addPtToKml( FILE* outKml, Item* pitem );
+void addCoordsToKml( FILE* outKml, Item* pitem );
+
 
 int wmain( int argc, LPTSTR argv[] )
 {
@@ -37,6 +41,7 @@ int wmain( int argc, LPTSTR argv[] )
     Item resultsItem = { 0 };
     PVOID oldValueWow64 = NULL;
     BOOL wow64Disabled = FALSE;
+    TCHAR* ptTchar = NULL;
 
     // Get index of first argument after options
     // Also determine which options are active
@@ -93,6 +98,16 @@ int wmain( int argc, LPTSTR argv[] )
 
     // Initialize results list
     InitializeList( &resultsList );
+
+    // Initialize list's name (measurement name)
+    ptTchar = wcsrchr( targetDir, L'\\' );
+
+    if ( ptTchar != NULL )
+        IniListName( &resultsList, ptTchar + 1 );
+    else
+        IniListName( &resultsList, TEXT( "" ) );
+
+    // Check mem availability
     if ( ListIsFull( &resultsList ) )
     {
         wprintf_s( TEXT( "\nNo memory available!\n" ) );
@@ -124,7 +139,7 @@ int wmain( int argc, LPTSTR argv[] )
         showResults( &resultsList, &resultsItem );
 
         // Generate KML file
-//        outputKml(  );
+        outputKml( &resultsList );
 
     }
 
@@ -340,6 +355,33 @@ void showItem( Item* pItem )
         pItem->findInfo.cFileName );
 }
 
+void addPtToKml( FILE* outKml, Item* pitem )
+{
+    TCHAR* ptTchar = NULL;
+    TCHAR ptName[ MAX_PATH ] = { 0 };
+
+    // Set up point's name
+    wcscpy_s( ptName, _countof( ptName ), pitem->findInfo.cFileName );
+    ptTchar = wcsrchr( ptName, L'.' );
+    if ( ptTchar != NULL )
+        *ptTchar = L'\0';
+
+    // Output point placemark
+    fwprintf_s( outKml, TEXT( "<Placemark>\n" ) );
+    fwprintf_s( outKml, TEXT( "  <name>%s</name>\n" ),
+        ptName );
+    fwprintf_s( outKml, TEXT( "  <Point>\n" ) );
+    fwprintf_s( outKml, TEXT( "    <coordinates>%s</coordinates>\n" ),
+        pitem->coords );
+    fwprintf_s( outKml, TEXT( "  </Point>\n" ) );
+    fwprintf_s( outKml, TEXT( "</Placemark>\n\n" ) );
+}
+
+void addCoordsToKml( FILE* outKml, Item* pitem )
+{
+    fwprintf_s( outKml, TEXT( "      %s\n" ), pitem->coords );
+}
+
 void sepThousands( const long long* numPt, TCHAR* acc, size_t elemsAcc )
 {
     static TCHAR app[ 32 ] = { 0 }; // append data (last three digits as chars)
@@ -413,4 +455,61 @@ BOOL procNmeaFile( TCHAR* fName, TCHAR* cdsOut, int cdsSize )
     }
 
     return result;
+}
+
+void outputKml( List* plist )
+{
+    errno_t err;
+    FILE* outKml = NULL;
+    TCHAR fName[ MAX_PATH ] = { 0 };
+
+    // Set up kml file's name
+    wcscpy_s( fName, _countof( fName ), plist->measureName );
+    wcscat_s( fName, _countof( fName ), TEXT( ".kml" ) );
+
+    // Set up 'lati' output file
+    err = _wfopen_s( &outKml, fName, TEXT( "w" ) );
+
+    if ( err != 0 )
+    {                       
+        fwprintf_s( stderr, TEXT( "Can't create output file.\n" ) );
+        return;
+    }
+
+    // Output header
+    fwprintf_s( outKml,
+        TEXT( "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" ) );
+    fwprintf_s( outKml,
+        TEXT( "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n\n" ) );
+    fwprintf_s( outKml, TEXT( "<Document>\n\n" ) );
+
+    // Output measurement points (placemarks) to kml file
+    TraverseToFile( plist, outKml, addPtToKml );
+
+    // Output polygon joining measurement points
+    fwprintf_s( outKml, TEXT( "<Placemark>\n" ) );
+    fwprintf_s( outKml, TEXT( "  <name>%s</name>\n" ), plist->measureName );
+    fwprintf_s( outKml, TEXT( "  <LineString>\n" ) );
+    fwprintf_s( outKml, TEXT( "    <coordinates>\n" ) );
+
+    // Add coods of all pts to kml
+    TraverseToFile( plist, outKml, addCoordsToKml );
+
+    // If needed, then close the polygon
+    // Output coords of first point again
+    if ( plist->iCount > 2 )
+        fwprintf_s( outKml, TEXT( "      %s\n" ), plist->head->item.coords );
+
+    // Terminate polygon output
+    fwprintf_s( outKml, TEXT( "    </coordinates>\n" ) );
+    fwprintf_s( outKml, TEXT( "  </LineString>\n" ) );
+    fwprintf_s( outKml, TEXT( "</Placemark>\n\n" ) );
+
+    // Output footer
+    fwprintf_s( outKml, TEXT( "</Document>\n\n" ) );
+    fwprintf_s( outKml, TEXT( "</kml>" ) );
+
+    // Close kml file
+    if ( fclose( outKml ) != 0 )
+        fwprintf_s( stderr, TEXT( "Error closing kml file\n" ) );
 }

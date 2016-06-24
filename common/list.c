@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <wchar.h>
 #include "list.h"
 
 /* local function prototype */
@@ -18,9 +19,15 @@ static void CopyToNode( Item item, Node * pnode );
 /* set the list to empty */
 void InitializeList( List* plist )
 {
-    ( *plist ).head = NULL;
-    ( *plist ).end = NULL;
-    ( *plist ).iCount = 0;
+    plist->head = NULL;
+    plist->end = NULL;
+    plist->iCount = 0;
+    wmemset( plist->measureName, 0, _countof( plist->measureName ) );
+}
+
+void IniListName( List* plist, TCHAR* mName )
+{
+    wcscpy_s( plist->measureName, _countof( plist->measureName ), mName );
 }
 
 /* returns true if list is empty */
@@ -106,6 +113,18 @@ void Traverse( List* plist, void ( *pfun )( Item* pItem ) )
     }
 }
 
+void TraverseToFile( List* plist, FILE* filePt,
+    void ( *pfun )( FILE* outKml, Item* pitem ) )
+{
+    Node* pnode = ( *plist ).head;      /* set to start of list   */
+
+    while ( pnode != NULL )
+    {
+        ( *pfun )( filePt, &pnode->item );  /* apply function to item */
+        pnode = pnode->next;                /* advance to next item   */
+    }
+}
+
 /* free memory allocated by malloc() */
 /* reset list structure              */
 void EmptyTheList( List* plist )
@@ -124,6 +143,9 @@ void EmptyTheList( List* plist )
 
     // Reset items count
     ( *plist ).iCount = 0;
+
+    // Reset measurement name
+    wmemset( plist->measureName, 0, _countof( plist->measureName ) );
 }
 
 /* local function definition  */

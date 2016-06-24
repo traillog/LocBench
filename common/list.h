@@ -20,7 +20,7 @@
 //================================================================
 // program-specific declarations
 //================================================================
-struct scanOut
+struct measurePt
 {
     TCHAR coords[ COORDS ];
     WIN32_FIND_DATA findInfo;
@@ -29,7 +29,7 @@ struct scanOut
 //================================================================
 // general type definitions
 //================================================================
-typedef struct scanOut Item;
+typedef struct measurePt Item;
 
 typedef struct node
 {
@@ -41,7 +41,8 @@ typedef struct list
 {
     Node* head;
     Node* end;
-    unsigned int iCount;    // Items count
+    unsigned int iCount;                // Items count
+    TCHAR measureName[ MAX_PATH ];      // Measurement name
 } List;
 
 //================================================================
@@ -52,6 +53,12 @@ typedef struct list
 /* preconditions:    plist points to a list                     */
 /* postconditions:   the list is initialized to empty           */
 void InitializeList( List* plist );
+
+/* operation:        initialize the list's name                 */
+/* preconditions:    plist points to a list                     */
+/*                   mName points to terminated null string     */
+/* postconditions:   list's name is initialized with mName      */
+void IniListName( List* plist, TCHAR* mName );
 
 /* operation:        determine if list is empty                 */
 /* precondition:     plist points to an initialized list        */
@@ -85,6 +92,17 @@ int AddItem( Item item, List* plist );
 /* postcondition:    the function pointed to by pfun is         */
 /*                   executed once for each item in the list    */
 void Traverse( List* plist, void ( *pfun )( Item* pItem ) );
+
+/* operation:        apply a function to each item in list      */
+/* preconditions:    plist points to an initialized list        */
+/*                   filePt points to open output file          */
+/*                   pfun points to a function that takes an    */
+/*                   Item argument and a pointer to open stream */
+/*                   file and has no return value               */
+/* postcondition:    the function pointed to by pfun is         */
+/*                   executed once for each item in the list    */
+void TraverseToFile( List* plist, FILE* filePt,
+    void ( *pfun )( FILE* outKml, Item* pitem ) );
 
 /* operation:        free allocated memory, if any              */
 /* precondition:     plist points to an initialized list        */
