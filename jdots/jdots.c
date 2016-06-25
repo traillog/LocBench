@@ -370,6 +370,7 @@ void addPtToKml( FILE* outKml, Item* pitem )
     fwprintf_s( outKml, TEXT( "<Placemark>\n" ) );
     fwprintf_s( outKml, TEXT( "  <name>%s</name>\n" ),
         ptName );
+    fwprintf_s( outKml, TEXT( "  <styleUrl>#mypushpin</styleUrl>\n" ) );
     fwprintf_s( outKml, TEXT( "  <Point>\n" ) );
     fwprintf_s( outKml, TEXT( "    <coordinates>%s</coordinates>\n" ),
         pitem->coords );
@@ -483,12 +484,34 @@ void outputKml( List* plist )
         TEXT( "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n\n" ) );
     fwprintf_s( outKml, TEXT( "<Document>\n\n" ) );
 
+    // Output styles
+    fwprintf_s( outKml, TEXT( "<Style id=\"mypushpin\">\n" ) );
+    fwprintf_s( outKml, TEXT( "  <LabelStyle>\n" ) );
+    fwprintf_s( outKml, TEXT( "    <scale>0.5</scale>\n" ) );
+    fwprintf_s( outKml, TEXT( "  </LabelStyle>\n" ) );
+    fwprintf_s( outKml, TEXT( "  <IconStyle>\n" ) );
+    fwprintf_s( outKml, TEXT( "    <scale>0.5</scale>\n" ) );
+    fwprintf_s( outKml, TEXT( "    <Icon>\n" ) );
+    fwprintf_s( outKml, TEXT( "      <href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>\n" ) );
+    fwprintf_s( outKml, TEXT( "    </Icon>\n" ) );
+    fwprintf_s( outKml, TEXT( "  </IconStyle>\n" ) );
+    fwprintf_s( outKml, TEXT( "</Style>\n\n" ) );
+
+    fwprintf_s( outKml, TEXT( "<Style id=\"myline\">\n" ) );
+    fwprintf_s( outKml, TEXT( "  <LineStyle>\n" ) );
+    fwprintf_s( outKml, TEXT( "    <color>ff7fff55</color>\n" ) );
+    fwprintf_s( outKml, TEXT( "    <colorMode>normal</colorMode>\n" ) );
+    fwprintf_s( outKml, TEXT( "    <width>4</width>\n" ) );
+    fwprintf_s( outKml, TEXT( "  </LineStyle>\n" ) );
+    fwprintf_s( outKml, TEXT( "</Style>\n\n" ) );
+
     // Output measurement points (placemarks) to kml file
     TraverseToFile( plist, outKml, addPtToKml );
 
     // Output polygon joining measurement points
     fwprintf_s( outKml, TEXT( "<Placemark>\n" ) );
     fwprintf_s( outKml, TEXT( "  <name>%s</name>\n" ), plist->measureName );
+    fwprintf_s( outKml, TEXT( "  <styleUrl>#myline</styleUrl>\n" ) );
     fwprintf_s( outKml, TEXT( "  <LineString>\n" ) );
     fwprintf_s( outKml, TEXT( "    <coordinates>\n" ) );
 
