@@ -13,6 +13,8 @@
 #define     LINEOUT     256
 #define     VALIN       32
 
+#define     PDOP_CUTOFF     140
+
 extern VOID ReportError( LPCTSTR userMsg, DWORD exitCode, BOOL prtErrorMsg );
 
 void addLat( char* hemis, char* valStr, Tree* pt );
@@ -48,6 +50,8 @@ int wmain( int argc, TCHAR* argv[] )
     TCHAR fileName[ FNAME ] = { 0 };
 
     BOOL dataOk = FALSE;
+    char* chPt = NULL;
+    int tmpPDOPint = 0;
     char status[ VALIN ] = { 0 };
     char hemiNS[ VALIN ] = { 0 };
     char hemiEW[ VALIN ] = { 0 };
@@ -192,10 +196,27 @@ int wmain( int argc, TCHAR* argv[] )
                 ++fieldNo;
             }
 
-            // Validate processed line
-            dataOk = ( strlen( status ) == 1 ) && ( strstr( status, "A" ) ) &&
+
+            // Validate processed line - Quality control
+            //
+            // This is done here, because the RMC message is
+            // the last message received for each point
+            
+            // Get PDOP int val
+            tmpPDOPint = atoi( tmpPDOP ) * 100;
+            
+            // Add PDOP decimal places
+            chPt = strchr( tmpPDOP, '.' );
+            if ( chPt )
+                tmpPDOPint += ( tmpPDOP[ 0 ] == '-' ? (-1) : 1 ) *
+                    atoi( chPt + 1 );
+
+            // Assess all conditions
+            dataOk = ( tmpPDOPint <= PDOP_CUTOFF ) &&
+                ( strlen( status ) == 1 ) && ( strstr( status, "A" ) ) &&
                 ( strlen( tmpLat ) == 9 ) && ( strlen( tmpLon ) == 10 );
 
+            // Store data point if valid
             if ( dataOk )
             {
                 // Store current vals into trees
@@ -467,17 +488,13 @@ void addPDOP( char* valStr, Tree* pt )
 
 void showValsScreen( Tree* pt, HANDLE hOut )
 {
-    if ( TreeIsEmpty( pt ) )
-        puts( "No entries!" );
-    else
+    if ( !( TreeIsEmpty( pt ) ) )
         Traverse( pt, printItemScr, hOut );
 }
 
 void showValsCSV( Tree* pt, HANDLE hOut )
 {
-    if ( TreeIsEmpty( pt ) )
-        puts( "No entries!" );
-    else
+    if ( !( TreeIsEmpty( pt ) ) )
         Traverse( pt, printItemCSV, hOut );
 }
 
