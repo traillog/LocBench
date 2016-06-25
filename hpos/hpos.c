@@ -18,6 +18,7 @@ extern VOID ReportError( LPCTSTR userMsg, DWORD exitCode, BOOL prtErrorMsg );
 void addLat( char* hemis, char* valStr, Tree* pt );
 void addLon( char* hemis, char* valStr, Tree* pt );
 void addAlt( char* valStr, Tree* pt );
+void addPDOP( char* valStr, Tree* pt );
 void fillWtVals( Tree* pt );
 void fillWtValItem( Item* itemPt, int wt, HANDLE hOut );
 double calcWtTotVal( Tree* pt );
@@ -28,7 +29,8 @@ void printItemScr( Item* itemPt, int ctTot, HANDLE hOut );
 void printItemCSV( Item* itemPt, int ctTot, HANDLE hOut );
 void outBasic( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt );
 void outDetail( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt );
-void outCVS( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName );
+void outCVS( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, Tree* ptTrPDOP,
+    TCHAR* fName );
 int txtToFile( CHAR* txtInPt, DWORD sizeBuf, HANDLE hOut );
 
 int wmain( int argc, TCHAR* argv[] )
@@ -52,10 +54,12 @@ int wmain( int argc, TCHAR* argv[] )
     char tmpLat[ VALIN ] = { 0 };
     char tmpLon[ VALIN ] = { 0 };
     char tmpAlt[ VALIN ] = { 0 };
+    char tmpPDOP[ VALIN ] = { 0 };
 
     Tree latTree;
     Tree lonTree;
     Tree altTree;
+    Tree pdopTree;
 
 
     //==============================================
@@ -92,6 +96,7 @@ int wmain( int argc, TCHAR* argv[] )
     InitializeTree( &latTree );
     InitializeTree( &lonTree );
     InitializeTree( &altTree );
+    InitializeTree( &pdopTree );
 
 
     //==============================================
@@ -139,6 +144,28 @@ int wmain( int argc, TCHAR* argv[] )
                 ++fieldNo;
             }
         }
+        else if ( strstr( inputLine, "$GPGSA" ) )   // Catch 'GSA' messages
+        {
+            // Look for Position-DOP
+
+            // Locate first field (token)
+            ptMsg = strtok_s( inputLine, ",*", &nextptMsg );
+
+            while ( ptMsg != NULL )
+            {
+                // Stop after finding
+                // first field with decimal places (contains a decimal point)
+                if ( strchr( ptMsg, '.' ) != NULL )
+                {
+                    memset( tmpPDOP, 0, _countof( tmpPDOP ) );
+                    strcpy_s( tmpPDOP, _countof( tmpPDOP ), ptMsg );
+                    break;
+                }
+
+                // Locate next field (token)
+                ptMsg = strtok_s( NULL, ",*", &nextptMsg );
+            }
+        }
         else if ( strstr( inputLine, "$GPRMC" ) )   // Catch 'RMC' messages
         {
             // Reset field counter
@@ -175,6 +202,7 @@ int wmain( int argc, TCHAR* argv[] )
                 addLat( hemiNS, tmpLat, &latTree );
                 addLon( hemiEW, tmpLon, &lonTree );
                 addAlt( tmpAlt, &altTree );
+                addPDOP( tmpPDOP, &pdopTree );
             }
 
             // Reset result strings
@@ -185,6 +213,7 @@ int wmain( int argc, TCHAR* argv[] )
             memset( tmpLat, 0, _countof( tmpLat ) );
             memset( tmpLon, 0, _countof( tmpLon ) );
             memset( tmpAlt, 0, _countof( tmpAlt ) );
+            memset( tmpPDOP, 0, _countof( tmpPDOP ) );
         }
 
         // Reset input line buffer
@@ -216,11 +245,13 @@ int wmain( int argc, TCHAR* argv[] )
     fillWtVals( &latTree );
     fillWtVals( &lonTree );
     fillWtVals( &altTree );
+    fillWtVals( &pdopTree );
 
     // Calc total accumulated weighted value
     calcWtTotVal( &latTree );
     calcWtTotVal( &lonTree );
     calcWtTotVal( &altTree );
+    calcWtTotVal( &pdopTree );
 
 
     //==============================================
@@ -238,7 +269,7 @@ int wmain( int argc, TCHAR* argv[] )
     
     // Output detailed data to CSV file
     // Option: -c
-    outCVS( &lonTree, &latTree, &altTree, fileName );
+    outCVS( &lonTree, &latTree, &altTree, &pdopTree, fileName );
 
 
     //==============================================
@@ -247,6 +278,7 @@ int wmain( int argc, TCHAR* argv[] )
     DeleteAll( &latTree );
     DeleteAll( &lonTree );
     DeleteAll( &altTree );
+    DeleteAll( &pdopTree );
 
     return 0;
 }
@@ -398,6 +430,41 @@ void addAlt( char* valStr, Tree* pt )
     }
 }
 
+void addPDOP( char* valStr, Tree* pt )
+{
+    Item tmpItem = { 0 };
+    char* chPt = NULL;
+
+    if ( TreeIsFull( pt ) )
+        puts( "Storage tree is full." );
+    else
+    {
+        // Set up new item
+
+        // Set up nmea value
+        memset( tmpItem.nmeaVal, 0, _countof( tmpItem.nmeaVal ) );
+        strcpy_s( tmpItem.nmeaVal, _countof( tmpItem.nmeaVal ), valStr );
+
+        // Set up int val
+        tmpItem.intVal = atoi( valStr ) * 100;
+
+        // Decimal places
+        chPt = strchr( valStr, '.' );
+        if ( chPt )
+            tmpItem.intVal += ( valStr[ 0 ] == '-' ? (-1) : 1 ) *
+                atoi( chPt + 1 );
+
+        // Set up double val org units
+        tmpItem.dblVal = ( double )tmpItem.intVal / 100;
+
+        // Set up pts counter
+        tmpItem.ct = 1;
+        
+        // Add new item to the tree
+        AddItem( &tmpItem, pt );
+    }
+}
+
 void showValsScreen( Tree* pt, HANDLE hOut )
 {
     if ( TreeIsEmpty( pt ) )
@@ -502,7 +569,7 @@ void outDetail( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt )
     wprintf_s( TEXT( "%79.8f\n" ), fetchWtTotVal( ptTrAlt ) );
 }
 
-void outCVS( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName )
+void outCVS( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, Tree* ptTrPDOP, TCHAR* fName )
 {
     HANDLE hFileOut;
     TCHAR fNameTot[ FNAME ] = { 0 };
@@ -554,6 +621,17 @@ void outCVS( Tree* ptTrLon, Tree* ptTrLat, Tree* ptTrAlt, TCHAR* fName )
 
     sprintf_s( bufOut, _countof( bufOut ), ",,,,,%.8f\n\n",
         fetchWtTotVal( ptTrAlt ) );
+    txtToFile( bufOut, _countof( bufOut ), hFileOut );
+
+    // Display P-DOP
+    sprintf_s( bufOut, _countof( bufOut ), "%s",
+        "P-DOP,[int],[org],ct,ctTot,[org]\n" );
+    txtToFile( bufOut, _countof( bufOut ), hFileOut );
+
+    showValsCSV( ptTrPDOP, hFileOut );
+
+    sprintf_s( bufOut, _countof( bufOut ), ",,,,,%.8f\n\n",
+        fetchWtTotVal( ptTrPDOP ) );
     txtToFile( bufOut, _countof( bufOut ), hFileOut );
 
     // Close handle
