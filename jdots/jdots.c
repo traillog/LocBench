@@ -501,7 +501,7 @@ void outputKml( List* plist )
     fwprintf_s( outKml, TEXT( "  <LineStyle>\n" ) );
     fwprintf_s( outKml, TEXT( "    <color>ff7fff55</color>\n" ) );
     fwprintf_s( outKml, TEXT( "    <colorMode>normal</colorMode>\n" ) );
-    fwprintf_s( outKml, TEXT( "    <width>4</width>\n" ) );
+    fwprintf_s( outKml, TEXT( "    <width>3</width>\n" ) );
     fwprintf_s( outKml, TEXT( "  </LineStyle>\n" ) );
     fwprintf_s( outKml, TEXT( "</Style>\n\n" ) );
 

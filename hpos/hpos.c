@@ -13,7 +13,7 @@
 #define     LINEOUT     256
 #define     VALIN       32
 
-#define     PDOP_CUTOFF     140
+#define     PDOP_CUTOFF     210
 
 extern VOID ReportError( LPCTSTR userMsg, DWORD exitCode, BOOL prtErrorMsg );
 
